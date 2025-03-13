@@ -1,0 +1,10 @@
+name = "lherzolite"
+version = "0.1.0"
+defaultTargets = ["lherzolite"]
+
+[[lean_lib]]
+name = "Lherzolite"
+
+[[lean_exe]]
+name = "lherzolite"
+root = "Main"
