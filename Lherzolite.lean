@@ -3,3 +3,4 @@
 import Lherzolite.BitRepr
 import Lherzolite.Interface
 import Lherzolite.Component
+import Lherzolite.Synthesize
