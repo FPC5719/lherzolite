@@ -2,6 +2,11 @@ name = "lherzolite"
 version = "0.1.0"
 defaultTargets = ["lherzolite"]
 
+[[require]]
+name = "Parser"
+git = "https://github.com/fgdorais/lean4-parser"
+rev = "main"
+
 [[lean_lib]]
 name = "Lherzolite"
 
