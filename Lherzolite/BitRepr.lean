@@ -22,6 +22,16 @@ def Slice (n : Nat) : Type :=
     | (l, r) => l < n ∧ l ≥ r
   }
 
+def Slice.extend (δ : Nat) (le : n + δ ≤ m) (s : Slice n) : Slice m :=
+  let ⟨(l, r), pn⟩ := s
+  let pm : (l + δ < m) ∧ (l + δ ≥ r + δ) := by
+    apply And.intro
+    calc l + δ
+      _ < n + δ := by simp [pn.left]
+      _ ≤ m     := le
+    simp [pn.right]
+  ⟨(l + δ, r + δ), pm⟩
+
 def SliceTy (s : Slice n) : Type :=
   match s with
   | ⟨(l, r), _⟩ => Bits (l - r + 1)
@@ -31,6 +41,21 @@ structure BitMask (n : Nat) : Type where
   equal : Bits n
   pat   : List (Slice n)
 
+instance : HAppend (BitMask n) (BitMask m) (BitMask (n + m)) where
+  hAppend p q := {
+    care  := Vector.append p.care  q.care ,
+    equal := Vector.append p.equal q.equal,
+    pat   := List.append
+      (p.pat.map (Slice.extend m (Nat.le_refl (n + m))))
+      (q.pat.map (Slice.extend 0 (Nat.le_add_left m n)))
+  }
+
+def BitMask.empty : BitMask 0 := {
+  care  := Vector.mkEmpty 0,
+  equal := Vector.mkEmpty 0,
+  pat   := []
+}
+
 def PatArgsTy (pat : List (Slice n)) : Type 1 :=
   HList (pat.map SliceTy)
 
@@ -38,18 +63,33 @@ abbrev BitMask.Parser (α : Type) : Type :=
   SimpleParser Substring Char α
 
 def BitMask.parser : BitMask.Parser ((n : Nat) × BitMask n) := do
-  let seg : BitMask.Parser _ :=
+  let seg : BitMask.Parser ((n : Nat) × BitMask n) := do
     let s := Parser.token '_'
-    let b := Parser.tokenList ['0', '1', '?']
-    Parser.sepBy1 s (Parser.takeMany1 b)
-  let pseg : BitMask.Parser _ := do
-    let _ ← Parser.token '('
-    let sg ← seg
-    let _ ← Parser.token ')'
-    pure sg
-  _
-
-
+    let b := do
+      pure (← Parser.tokenList ['0', '1', '?']).toArray
+    let res ← Parser.sepBy1 s (Parser.takeMany1 b)
+    let resf := res.flatten.flatten.toVector
+    let k : BitMask resf.size := {
+      care  := resf.map fun
+        | '0' | '1' => true
+        | _         => false,
+      equal := resf.map fun
+        | '1' => true
+        | _   => false,
+      pat   := []
+    }
+    pure ⟨resf.size, k⟩
+  let pseg : BitMask.Parser ((n : Nat) × BitMask n) := do
+    let ⟨n, k⟩ ← Parser.token '(' *> seg <* Parser.token ')'
+    match n with
+    | 0 => pure ⟨0, k⟩
+    | .succ m =>
+      pure ⟨m.succ, { k with pat := [⟨(m, 0), by simp⟩] }⟩
+  let resl ← takeMany1 $ pseg <|> seg
+  let res : (n : Nat) × BitMask n := resl.foldl
+    (fun ⟨n, kn⟩ ⟨m, km⟩ => ⟨n + m, kn ++ km⟩)
+    ⟨0, BitMask.empty⟩
+  pure res
 
 
 
